@@ -13,7 +13,7 @@ from flask import Flask, jsonify, render_template, request
 # .env file se variables load karne ke liye
 load_dotenv()
 
-ROOT = Path(__file__).resolve().parent
+ROOT = Path(__file__).resolve().parent.parent
 app = Flask(__name__, template_folder=str(ROOT / "templates"), static_folder=str(ROOT / "public"), static_url_path="")
 app.config["MAX_CONTENT_LENGTH"] = 32 * 1024
 
@@ -75,10 +75,13 @@ def home():
 
 
 @app.get("/api/health")
+@app.get("/health")
 def health():
     return jsonify({"ok": True, "groqConfigured": bool(os.getenv("GROQ_API_KEY")), "model": MODEL})
 
 
+# Route both /ask and /api/ask to avoid 404
+@app.post("/ask")
 @app.post("/api/ask")
 def ask():
     payload = request.get_json(silent=True) or {}
@@ -105,7 +108,7 @@ def ask():
 
     api_key = os.getenv("GROQ_API_KEY", "").strip()
     if not api_key:
-        return jsonify({"error": "Groq is not connected yet. Set GROQ_API_KEY in the environment on the device running app.py."}), 503
+        return jsonify({"error": "Groq is not connected yet. Set GROQ_API_KEY in Vercel environment variables."}), 503
 
     user_prompt = (
         f"Module: {mode}. Reply in {language}. "
@@ -139,7 +142,7 @@ def ask():
     except urllib.error.HTTPError as error:
         detail = error.read().decode("utf-8", errors="replace")[:500]
         if error.code == 401:
-            message = "Groq rejected the configured API key. Check GROQ_API_KEY on the device."
+            message = "Groq rejected the configured API key. Check GROQ_API_KEY in Vercel settings."
         elif error.code == 429:
             message = "Groq is temporarily rate-limited. Please wait a moment and try again."
         else:
